@@ -13,28 +13,28 @@ on:
     branches:
        - main
     paths:
-       -  'databricks_analytics/**'
+       -  'databrick_analytics/**'
 
 jobs:
     deploy:
       name:  'Deploy bundle'
-      runs_on: ubuntu-latest
+      runs-on: ubuntu-latest
 
 
       steps:
       #check out this repo,so that this workflow can access it.
-      -uses: actions/checkout@v3
+      - uses: actions/checkout@v3
 
       #Downlaod the Databricks Cli
       # see https://github.com/databricks/setup-cli
-      -uses: databricks/setup-cli@main
+      - uses: databricks/setup-cli@main
 
       #Deploy the bundle to the "prod" target as defined
       #In the bundle's setting file.
-      -run: databricks bundle deploy
-      working-directory: databricks_analytics
+      - run: databricks bundle deploy
+      working-directory: databrick_analytics
       env:
-         DATABRICKS_TOKEN: ${{ secrets.SP_TOKEN}}
+         DATABRICKS_TOKEN: ${{ secrets.SP_TOKEN }}
          DATABRICKS_BUNDLE_ENV: prod
       
       
@@ -46,4 +46,3 @@ jobs:
 
 
 
-    mnn
