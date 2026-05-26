@@ -9,7 +9,8 @@ concurrency: 1
 # Trigger this workflow whwenever a pull request is pushed to the repo's
 # mainn branch 
 on: 
-  push: 
+   workflow_dispatch:
+   push: 
     branches:
        - main
     paths:
