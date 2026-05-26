@@ -22,13 +22,12 @@ targets:
     # See also https://docs.databricks.com/dev-tools/bundles/deployment-modes.html.
     mode: development
     presets:
-      name_prefix: dev_
-
+      name_prefix: dev_${workspace.current_user.short_name}_
     default: true
     workspace:
       host: https://dbc-3410a8fa-59bb.cloud.databricks.com
     variables:
-      catalog: databricks_analytics_dev
+      catalog: dev_databricks_analytics
       schema: md
   prod:
     mode: production
