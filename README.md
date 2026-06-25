@@ -1,4 +1,4 @@
-# Databricks Analytics Pipeline
+# Databricks Analytics Pipeline: PySpark Transforms, Tests, CI, Docs
 
 A production-style analytics pipeline built with **Python**, **PySpark**, and **Databricks Asset Bundles (DAB)**. Ingests the NYC Taxi and Bakehouse sample datasets, runs them through a multi-stage transformation layer, and writes analytics-ready tables to Unity Catalog. Deployed automatically to a Databricks workspace via GitHub Actions.
 
