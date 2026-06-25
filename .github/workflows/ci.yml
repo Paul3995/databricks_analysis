@@ -1,0 +1,71 @@
+name: CI
+
+# Run on every push and every pull request targeting main.
+# No Databricks credentials are needed — only the offline unit tests run here.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-tests:
+    name: Unit tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+
+    # All 'run' steps execute from inside the bundle directory so that
+    # relative imports and pyproject.toml are resolved correctly.
+    defaults:
+      run:
+        working-directory: databrick_analytics
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # PySpark requires a JVM. Temurin is the Eclipse Foundation's
+      # free OpenJDK distribution — widely used in CI.
+      - name: Set up Java 11 (required by PySpark)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "11"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      # Install PySpark and pytest separately from databricks-connect so
+      # the unit tests run without any Databricks cluster or credentials.
+      - name: Install test dependencies
+        run: pip install "pyspark==3.5.3" pytest pytest-cov
+
+      # Install the package in editable mode so pytest can import
+      # databrick_analytics.taxis without path manipulation.
+      - name: Install package
+        run: pip install -e . --no-deps
+
+      # Run only tests/test_taxis.py — the offline unit tests.
+      # tests/sample_taxis_test.py requires a live Databricks cluster and is
+      # intentionally excluded from this workflow.
+      - name: Run unit tests
+        run: |
+          pytest tests/test_taxis.py \
+            --tb=short \
+            --cov=src/databrick_analytics \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            -v
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report
+          path: databrick_analytics/coverage.xml

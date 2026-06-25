@@ -15,9 +15,9 @@ resources:
           webhook_notifications: {}
       parameters:
         - name: catalog
-          default: pro_databricks_analytics
-        - name: shema
-          default: 'md '
+          default: ${var.catalog}
+        - name: schema
+          default: ${var.schema}
       email_notifications:
         no_alert_for_skipped_runs: false
       environments:

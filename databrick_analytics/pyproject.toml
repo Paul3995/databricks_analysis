@@ -14,7 +14,9 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest",
+    "pytest-cov",
     "ruff",
+    "pyspark==3.5.3",        # for local unit tests without a Databricks cluster
     "databricks-dlt",
     "databricks-connect>=15.4,<15.5",
     "ipykernel",
