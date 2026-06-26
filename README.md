@@ -1,6 +1,6 @@
-# Databricks Analytics Pipeline: PySpark Transforms, Tests, CI, Docs
+# Databricks Analytics Pipeline
 
-A production-style analytics pipeline built with **Python**, **PySpark**, and **Databricks Asset Bundles (DAB)**. Ingests the NYC Taxi and Bakehouse sample datasets, runs them through a multi-stage transformation layer, and writes analytics-ready tables to Unity Catalog. Deployed automatically to a Databricks workspace via GitHub Actions.
+A production-style analytics pipeline built on Databricks, using PySpark for transformations and Unity Catalog for storage. It ingests NYC Taxi and Bakehouse sample data, runs it through a multi-stage processing layer, and writes analytics-ready tables that get queried through notebooks. The whole thing deploys automatically to a Databricks workspace via GitHub Actions.
 
 ---
 
@@ -45,11 +45,11 @@ A production-style analytics pipeline built with **Python**, **PySpark**, and **
 | Layer | Technology | Why |
 |---|---|---|
 | Platform | Databricks Asset Bundles | Infrastructure-as-code for workspace, jobs, and permissions |
-| Transformation | PySpark 3.5 | Demonstrates partitioning, broadcast joins, window functions |
+| Transformation | PySpark 3.5 | Partitioning, broadcast joins, window functions |
 | Analytics DB | Unity Catalog | Centralised governance, fine-grained access control, Delta Lake |
 | Orchestration | Lakeflow Jobs | Native Databricks scheduler with task dependency management |
-| Testing | pytest + local PySpark | Pure-function unit tests run without a cluster |
-| CI/CD | GitHub Actions | Unit tests on every push; bundle deploy to prod on merge to main |
+| Testing | pytest + local PySpark | Unit tests that run without a cluster |
+| CI/CD | GitHub Actions | Tests on every push; bundle deploy to prod on merge to main |
 
 ---
 
@@ -144,8 +144,7 @@ cd databrick_analytics
 pytest tests/test_taxis.py -v
 ```
 
-Covers: `clean_trips`, `add_derived_columns`, `compute_hourly_revenue`,
-`compute_pickup_zone_revenue`, `compute_daily_zone_stats`, `add_rolling_revenue`.
+Covers: `clean_trips`, `add_derived_columns`, `compute_hourly_revenue`, `compute_pickup_zone_revenue`, `compute_daily_zone_stats`, `add_rolling_revenue`.
 
 ### Integration tests — requires a live cluster
 
@@ -161,50 +160,32 @@ pytest tests/sample_taxis_test.py -v
 
 ### Pure functions with injected SparkSession
 
-All transformation logic in `taxis.py` accepts `spark` as a parameter rather than
-importing it from `databricks.sdk.runtime`. This is dependency injection: the same
-function runs in a local pytest (with a plain `SparkSession.builder.master("local[*]")`)
-and in a Databricks job (with the cluster session) without any code change. It also
-makes the functions trivially unit-testable — just pass a small in-memory DataFrame.
+All transformation logic in `taxis.py` takes `spark` as a parameter rather than importing it from `databricks.sdk.runtime`. This means the same function runs in a local pytest and in a Databricks job without any code change — you just pass a different session. It also makes unit testing straightforward since there's no global state to work around.
 
-### Window functions: `rangeBetween` vs `rowsBetween`
+### `rangeBetween` vs `rowsBetween` for rolling revenue
 
-The 7-day rolling revenue uses `rangeBetween(-6 * 86400, 0)` rather than
-`rowsBetween(-6, 0)`. `rowsBetween` counts preceding *rows*, which silently produces
-wrong results when a zip code has missing days (e.g. no trips on a public holiday).
-`rangeBetween` works on the actual numeric value of the ORDER BY column (Unix seconds),
-so it always spans exactly 7 calendar days regardless of data gaps.
+The 7-day rolling revenue uses `rangeBetween(-6 * 86400, 0)` rather than `rowsBetween(-6, 0)`. The row-based version counts preceding rows, which silently breaks when a zone has missing days — say, no trips on a public holiday. The range-based version works on actual Unix timestamps, so it always covers exactly 7 calendar days regardless of gaps in the data.
 
 ### `DENSE_RANK()` over `RANK()` in notebooks
 
-`DENSE_RANK()` assigns the same rank to tied rows and leaves no gaps in the sequence.
-`RANK()` produces gaps (1, 1, 3, 4...) which confuse business stakeholders reading
-"Top N markets" reports. `DENSE_RANK()` always produces a clean 1, 2, 3... sequence.
+`DENSE_RANK()` handles ties without leaving gaps in the sequence. `RANK()` produces sequences like 1, 1, 3, 4... which confuse stakeholders reading "Top N markets" reports. `DENSE_RANK()` always produces a clean 1, 2, 3... which is what people actually expect.
 
 ### `NULLIF` in percentage calculations
 
-Every division in the SQL notebooks wraps the denominator in `NULLIF(x, 0)`. This
-returns NULL instead of a divide-by-zero exception when a group has zero count.
-NULL propagates cleanly through downstream aggregations and is far easier to reason
-about than NaN or Infinity.
+Every division in the SQL notebooks wraps the denominator in `NULLIF(x, 0)`. This returns NULL instead of throwing a divide-by-zero error when a group has zero count. NULL propagates cleanly through aggregations and is much easier to handle downstream than NaN or Infinity.
 
 ### LEFT JOIN in customer_360
 
-The customer-to-transaction join uses LEFT JOIN so countries with customers but no
-recorded transactions still appear in the output. An INNER JOIN would silently drop
-those markets, making the customer count inconsistent with the raw table — a subtle
-but significant data quality bug.
+The customer-to-transaction join is a LEFT JOIN so countries with customers but no transactions still appear in the output. An INNER JOIN would silently drop those markets, making the customer count inconsistent with the raw table — a subtle data quality bug that's easy to miss.
 
-### Dev vs prod targets in `databricks.yml`
+### Dev vs prod targets
 
-Separate targets use different catalog names (`dev_databricks_analytics` vs
-`pro_databricks_analytics`). Every developer deploys to their own isolated catalog,
-notebook widgets default to dev, and the CI/CD only deploys to prod on merge to main.
+Separate targets in `databricks.yml` use different catalog names (`dev_databricks_analytics` vs `pro_databricks_analytics`). Each developer deploys to their own isolated catalog, and the CI/CD only promotes to prod on merge to main. This keeps dev experiments from polluting prod data.
 
 ### Two-workflow CI strategy
 
-`ci.yml` runs unit tests on every push using plain PySpark — no Databricks credentials
-needed, so it is fast and free on any branch. `prod_deployment.yml` deploys the bundle
-only on merge to `main` using a service-principal token stored as a GitHub secret.
-Code quality gates are always credential-free; the privileged deployment step is gated
-on peer review.
+`ci.yml` runs unit tests on every push using plain PySpark — no credentials needed, no cluster costs. `prod_deployment.yml` only runs on merge to main and requires a service-principal token stored as a GitHub secret. Quality gates stay cheap and fast; the deployment step is gated behind peer review.
+
+---
+
+**Author:** [@Paul3995](https://github.com/Paul3995)
